@@ -1,0 +1,8 @@
+{
+  "name": "Memory Beads",
+  "description": "A digital craft table to archive memories as stylized beads. Capture objects, remove the noise of the world, and attach your stories.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
