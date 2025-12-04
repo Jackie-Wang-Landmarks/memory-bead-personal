@@ -59,8 +59,8 @@ export const Bead: React.FC<BeadProps> = ({ data, onClick, size = 'md', classNam
       
       {size !== 'xl' && (
         <div className="flex flex-col items-center opacity-80 group-hover:opacity-100 transition-opacity text-center">
-           <span className="font-serif text-xs font-bold text-gray-700 tracking-widest truncate max-w-[100px]">{data.title}</span>
-           <span className="text-[10px] text-gray-500">{data.date}</span>
+           <span className="font-serif text-xs font-bold text-white/90 tracking-widest truncate max-w-[100px]">{data.title}</span>
+           <span className="text-[10px] text-white/60">{data.date}</span>
         </div>
       )}
     </div>

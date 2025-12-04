@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { BeadData, Tab, ImageAnalysisResult, BeadEcho } from './types';
+import { BeadData, Tab, ImageAnalysisResult, BeadEcho, CoreBead } from './types';
 import { analyzeImageForBead, generateReflectionQuestions } from './services/geminiService';
 import { GrainOverlay } from './components/GrainOverlay';
 import { NeumorphicButton } from './components/NeumorphicButton';
 import { Bead } from './components/Bead';
-import { Plus, Mic, Image as ImageIcon, Disc, Grid, Sparkles, X, Loader2, Camera, Infinity, ChevronLeft, StopCircle, Play, Pause, Trash2, Pencil } from 'lucide-react';
+import { Plus, Mic, Image as ImageIcon, Disc, Grid, Sparkles, X, Loader2, Camera, Infinity, ChevronLeft, StopCircle, Play, Pause, Trash2, Pencil, UploadCloud, User, RefreshCw, Check } from 'lucide-react';
 
 // Initial Mock Data
 const INITIAL_BEADS: BeadData[] = [
@@ -186,16 +186,20 @@ const getSupportedMimeType = () => {
 interface ExpandModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (text: string, images: string[], audio: string | undefined) => void;
+  onSave: (title: string, text: string, images: string[], audio: string | undefined) => void;
   title?: string;
   initialData?: {
+    title?: string;
     text: string;
     images: string[];
     audio?: string;
   };
+  mode?: 'edit' | 'echo';
+  isDraft?: boolean;
 }
 
-const ExpandModal: React.FC<ExpandModalProps> = ({ isOpen, onClose, onSave, title = "Expand Memory", initialData }) => {
+const ExpandModal: React.FC<ExpandModalProps> = ({ isOpen, onClose, onSave, title = "Expand Memory", initialData, mode = 'echo', isDraft = false }) => {
+  const [localTitle, setLocalTitle] = useState('');
   const [localText, setLocalText] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [recordedBlobUrl, setRecordedBlobUrl] = useState<string | null>(null);
@@ -209,6 +213,7 @@ const ExpandModal: React.FC<ExpandModalProps> = ({ isOpen, onClose, onSave, titl
   // Initialize state when modal opens
   useEffect(() => {
     if (isOpen) {
+        setLocalTitle(initialData?.title || '');
         setLocalText(initialData?.text || '');
         setLocalImages(initialData?.images || []);
         setRecordedBlobUrl(initialData?.audio || null);
@@ -281,14 +286,22 @@ const ExpandModal: React.FC<ExpandModalProps> = ({ isOpen, onClose, onSave, titl
   };
 
   const handleSaveAction = () => {
-      onSave(localText, localImages, recordedBlobUrl || undefined);
+      onSave(localTitle, localText, localImages, recordedBlobUrl || undefined);
       onClose();
   };
 
   if (!isOpen) return null;
 
+  // Dynamic button label
+  let saveLabel = "Save";
+  if (isDraft) {
+      saveLabel = mode === 'edit' ? "Update Draft" : "Confirm to Collection";
+  } else {
+      saveLabel = mode === 'edit' ? "Save Changes" : "Add Echo";
+  }
+
   return (
-      <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+      <div className="fixed inset-0 z-[80] flex items-end justify-center sm:items-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
           <div className="w-full max-w-md bg-clay rounded-3xl p-6 shadow-2xl animate-slide-up flex flex-col gap-6">
               <div className="flex justify-between items-center border-b border-gray-300 pb-4">
                   <h3 className="font-serif text-xl text-gray-700">{title}</h3>
@@ -297,13 +310,32 @@ const ExpandModal: React.FC<ExpandModalProps> = ({ isOpen, onClose, onSave, titl
                   </button>
               </div>
 
+              {/* Title Input - Only show in Edit mode */}
+              {mode === 'edit' && (
+                  <div className="flex flex-col gap-2">
+                     <label className="text-xs font-bold text-gray-500 uppercase tracking-wide ml-1">Title</label>
+                     <input 
+                        type="text"
+                        value={localTitle}
+                        onChange={(e) => setLocalTitle(e.target.value)}
+                        className="w-full bg-white/50 rounded-xl p-3 text-gray-800 font-serif font-bold text-lg focus:outline-none focus:ring-2 focus:ring-blue-200"
+                        placeholder="Memory Title"
+                     />
+                  </div>
+              )}
+
               {/* Text Input */}
-              <textarea 
-                  className="w-full h-32 bg-white/50 rounded-xl p-4 text-gray-700 resize-none focus:outline-none focus:ring-2 focus:ring-blue-200"
-                  placeholder="Write your story..."
-                  value={localText}
-                  onChange={(e) => setLocalText(e.target.value)}
-              />
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wide ml-1">
+                    {mode === 'echo' && !isDraft ? "Your Echo" : "Story"}
+                </label>
+                <textarea 
+                    className="w-full h-32 bg-white/50 rounded-xl p-4 text-gray-700 resize-none focus:outline-none focus:ring-2 focus:ring-blue-200"
+                    placeholder={mode === 'echo' && !isDraft ? "Add a new layer to this memory..." : "Write your story..."}
+                    value={localText}
+                    onChange={(e) => setLocalText(e.target.value)}
+                />
+              </div>
 
               {/* Media Controls */}
               <div className="flex gap-4 h-16">
@@ -355,6 +387,9 @@ const ExpandModal: React.FC<ExpandModalProps> = ({ isOpen, onClose, onSave, titl
                               >
                                   <X size={12} className="text-red-500" />
                               </button>
+                              {mode === 'edit' && idx === 0 && (
+                                  <span className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[9px] text-center py-0.5 rounded-b-lg">Cover</span>
+                              )}
                           </div>
                       ))}
                   </div>
@@ -362,7 +397,7 @@ const ExpandModal: React.FC<ExpandModalProps> = ({ isOpen, onClose, onSave, titl
 
               <NeumorphicButton 
                   variant="black" 
-                  label="Save" 
+                  label={saveLabel} 
                   onClick={handleSaveAction} 
                   className="w-full !rounded-full shadow-lg"
               />
@@ -378,35 +413,53 @@ export default function App() {
   const [beads, setBeads] = useState<BeadData[]>(INITIAL_BEADS);
   const [dailyBead, setDailyBead] = useState<BeadData>(DAILY_PROMPT_BEAD);
   
-  // Selection State
-  const [activeBeadId, setActiveBeadId] = useState<string>(INITIAL_BEADS[1].id); 
-  const activeBead = beads.find(b => b.id === activeBeadId) || dailyBead;
-
+  // Daily Queue from JSON Import
+  const [dailyQueue, setDailyQueue] = useState<BeadData[]>([]);
+  const [rawImportData, setRawImportData] = useState<CoreBead[] | null>(null);
+  const [playerSelectOptions, setPlayerSelectOptions] = useState<string[]>([]);
+  const [showPlayerSelect, setShowPlayerSelect] = useState(false);
+  
+  // Collection View State
+  const [selectedCollectionBeadId, setSelectedCollectionBeadId] = useState<string | null>(null);
+  
   // Echo Tab Specifics
   const [echoQuestionIndex, setEchoQuestionIndex] = useState(0);
   const [isQuestionFading, setIsQuestionFading] = useState(false);
+  
+  // Modal State
   const [isExpandModalOpen, setIsExpandModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState<'expand' | 'edit'>('expand');
+  const [modalMode, setModalMode] = useState<'echo' | 'edit'>('echo');
 
-  // Creation/Edit State
+  // Creation State
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [storyText, setStoryText] = useState('');
   const [tempAnalysis, setTempAnalysis] = useState<ImageAnalysisResult | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const jsonInputRef = useRef<HTMLInputElement>(null);
+
+  // Computed Active Bead Logic
+  // Echo Tab: Always checks dailyQueue[0] or fallback dailyBead
+  // Collection Popover: Checks beads.find(id)
+  const queueHead = dailyQueue.length > 0 ? dailyQueue[0] : null;
+  const collectionBead = selectedCollectionBeadId ? beads.find(b => b.id === selectedCollectionBeadId) : null;
+  
+  // Determine which bead controls the question rotation
+  const rotatingBead = activeTab === 'echo' ? (queueHead || dailyBead) : collectionBead;
+  const activeModalBead = selectedCollectionBeadId ? collectionBead : (queueHead || dailyBead);
 
   // --- Effects ---
 
   // Rotate Echo Questions
   useEffect(() => {
-    if (activeTab !== 'echo' || isExpandModalOpen) return;
+    if (!rotatingBead || isExpandModalOpen) return;
 
     const interval = setInterval(() => {
       setIsQuestionFading(true);
       setTimeout(() => {
         setEchoQuestionIndex(prev => {
-          const questions = activeBead.echoQuestions || [];
+          const questions = rotatingBead.echoQuestions || [];
           return (prev + 1) % (questions.length || 1);
         });
         setIsQuestionFading(false);
@@ -414,31 +467,110 @@ export default function App() {
     }, 7000); 
 
     return () => clearInterval(interval);
-  }, [activeTab, activeBead, isExpandModalOpen]);
+  }, [rotatingBead, isExpandModalOpen]);
 
   // Generate Questions if missing
   useEffect(() => {
-    const fetchQuestions = async () => {
-      if (activeBead.userStory && (!activeBead.echoQuestions || activeBead.echoQuestions.length === 0)) {
-         const questions = await generateReflectionQuestions(activeBead.userStory, activeBead.title);
-         const updateBeads = (prevBeads: BeadData[]) => prevBeads.map(b => 
-            b.id === activeBead.id ? { ...b, echoQuestions: questions } : b
-         );
-         if (activeBead.type === 'daily') {
-             setDailyBead(prev => ({ ...prev, echoQuestions: questions }));
-         } else {
-             setBeads(updateBeads);
-         }
-      }
+    const checkAndGenerate = async (bead: BeadData, isQueue: boolean) => {
+        if (bead.userStory && (!bead.echoQuestions || bead.echoQuestions.length === 0)) {
+            const questions = await generateReflectionQuestions(bead.userStory, bead.title);
+            if (isQueue) {
+                 setDailyQueue(prev => prev.map(b => b.id === bead.id ? { ...b, echoQuestions: questions } : b));
+                 if (bead.id === dailyBead.id) setDailyBead(prev => ({ ...prev, echoQuestions: questions }));
+            } else {
+                 setBeads(prev => prev.map(b => b.id === bead.id ? { ...b, echoQuestions: questions } : b));
+            }
+        }
     };
-    fetchQuestions();
-  }, [activeBead]);
+
+    if (activeTab === 'echo') {
+        if (queueHead) checkAndGenerate(queueHead, true);
+        else checkAndGenerate(dailyBead, true);
+    } else if (collectionBead) {
+        checkAndGenerate(collectionBead, false);
+    }
+  }, [activeTab, queueHead, dailyBead, collectionBead]);
 
   // --- Helpers ---
 
   const getRandomShape = () => {
     const r = () => Math.floor(Math.random() * 20) + 40; 
     return `${r()}% ${100-r()}% ${r()}% ${100-r()}% / ${r()}% ${r()}% ${100-r()}% ${100-r()}%`;
+  };
+
+  const getPastelColor = () => {
+    const hue = Math.floor(Math.random() * 360);
+    return `hsl(${hue}, 70%, 85%)`;
+  };
+
+  // --- Import Logic ---
+
+  const handleJsonUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const json = JSON.parse(e.target?.result as string) as CoreBead[];
+          if (Array.isArray(json)) {
+            setRawImportData(json);
+            const players = Array.from(new Set(json.map(b => b.playerId)));
+            if (players.length > 1) {
+               setPlayerSelectOptions(players);
+               setShowPlayerSelect(true);
+            } else if (players.length === 1) {
+               importBeadsForPlayer(players[0], json);
+            } else {
+               alert("No valid player data found in JSON.");
+            }
+          }
+        } catch (err) {
+          console.error("Invalid JSON", err);
+          alert("Failed to parse JSON file.");
+        }
+      };
+      reader.readAsText(file);
+    }
+  };
+
+  const importBeadsForPlayer = (playerId: string, dataOverride?: CoreBead[]) => {
+    const sourceData = dataOverride || rawImportData;
+    if (!sourceData) return;
+
+    const filtered = sourceData.filter(b => b.playerId === playerId && b.type === 'STORY');
+    
+    const newQueue: BeadData[] = filtered.map(core => ({
+        id: `daily-${core.id}`,
+        type: 'daily',
+        title: core.keyword || "Imported Memory",
+        prompt: core.storySnippet || "What else do you remember?",
+        userStory: core.fullStory,
+        date: new Date(core.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+        dominantColor: getPastelColor(),
+        shape: getRandomShape(),
+        isDraft: true,
+        echoQuestions: [],
+        echoes: [],
+        audioUrl: core.audioUrl,
+        additionalImages: core.images || [],
+        imageUrl: core.images?.[0] || undefined
+    }));
+
+    setDailyQueue(newQueue);
+    setShowPlayerSelect(false);
+    setActiveTab('echo');
+  };
+
+  // --- Queue Logic ---
+
+  const swapToNextDailyPrompt = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    if (dailyQueue.length <= 1) return;
+    setDailyQueue(prev => {
+      const [first, ...rest] = prev;
+      return [...rest, first];
+    });
+    setEchoQuestionIndex(0);
   };
 
   // --- Handlers ---
@@ -482,75 +614,109 @@ export default function App() {
     };
 
     setBeads(prev => [newBead, ...prev]);
-    setActiveBeadId(newBead.id);
     resetCreation();
-    setActiveTab('echo');
+    setActiveTab('collection');
+    // Open the new bead
+    setSelectedCollectionBeadId(newBead.id);
   };
 
-  const handleEditOriginal = (e: React.MouseEvent) => {
+  const handleEdit = (e: React.MouseEvent) => {
       e.stopPropagation();
       setModalMode('edit');
       setIsExpandModalOpen(true);
   };
 
-  const handleExpand = (e?: React.MouseEvent) => {
+  const handleEcho = (e?: React.MouseEvent) => {
       e?.stopPropagation();
-      setModalMode('expand');
+      setModalMode('echo'); // 'echo' here means adding Echo content or Finalizing draft
       setIsExpandModalOpen(true);
   };
 
-  const handleSaveModal = (text: string, images: string[], audio: string | undefined) => {
+  const handleSaveModal = (title: string, text: string, images: string[], audio: string | undefined) => {
+      // Determine what we are editing
+      const isCollectionMode = selectedCollectionBeadId !== null;
+      const targetBead = isCollectionMode ? collectionBead : (queueHead || dailyBead);
+      
+      if (!targetBead) return;
+
       if (modalMode === 'edit') {
-          // Update the original bead content directly
+          // Editing existing content: 
+          // First image in list becomes bead cover (imageUrl), rest are additional
+          const newImageUrl = images.length > 0 ? images[0] : undefined;
+          const newAdditionalImages = images.length > 1 ? images.slice(1) : [];
+
           const updatedBead = {
-              ...activeBead,
+              ...targetBead,
+              title: title,
               userStory: text,
-              additionalImages: images,
+              imageUrl: newImageUrl,
+              additionalImages: newAdditionalImages,
               audioUrl: audio,
           };
           
-          if (activeBead.type === 'daily') {
-              setDailyBead(updatedBead);
+          if (isCollectionMode) {
+              setBeads(prev => prev.map(b => b.id === targetBead.id ? updatedBead : b));
           } else {
-              setBeads(prev => prev.map(b => b.id === activeBead.id ? updatedBead : b));
+              // We are editing a draft in the queue
+              if (queueHead) {
+                  setDailyQueue(prev => prev.map(b => b.id === targetBead.id ? updatedBead : b));
+              } else {
+                  setDailyBead(updatedBead);
+              }
           }
       } else {
-          // Default behavior: Add Echo or fill draft
-          updateBeadContent(text, images, audio);
+          // 'Echo' Mode: Either finalizing a draft OR adding a blog entry
+          if (targetBead.isDraft) {
+             // Finalize Draft -> Collection
+             // If user added images here (finalization), where do they go?
+             // Prompt says: "if through echo, then it's added to the paper slip"
+             // But usually for draft finalization we might want a cover image if none exists.
+             // We will stick to the rule: Echo -> Paper slip (additionalImages).
+             // However, if the bead has NO image, we might want to populate it.
+             // Let's stick to the rule requested: images added here go to additionalImages/Echo.
+             
+             // Keep existing cover if any, append all new images to additional
+             // Note: 'images' from modal contains ALL images currently in the modal inputs.
+             // But in 'echo' mode, initialData doesn't pre-populate images usually, so 'images' are NEW images.
+             
+             const finalizedBead = {
+                 ...targetBead,
+                 title: title,
+                 userStory: text, 
+                 additionalImages: images.length > 0 ? [...(targetBead.additionalImages || []), ...images] : targetBead.additionalImages,
+                 audioUrl: audio || targetBead.audioUrl,
+                 isDraft: false,
+                 shape: getRandomShape(),
+                 date: new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+                 echoes: [] 
+             };
+
+             setBeads(prev => [finalizedBead, ...prev]);
+             
+             // Remove from queue
+             if (queueHead) {
+                 setDailyQueue(prev => prev.filter(b => b.id !== targetBead.id));
+             } else {
+                 setDailyBead(prev => ({...prev, id: Date.now().toString(), isDraft: true, userStory: ''}));
+             }
+          } else {
+              // Add Echo to existing Collection Bead
+              const newEcho: BeadEcho = {
+                  id: Date.now().toString(),
+                  date: new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }),
+                  text: text,
+                  images: images,
+                  audioUrl: audio
+              };
+
+              const updatedBead = {
+                  ...targetBead,
+                  echoes: [...(targetBead.echoes || []), newEcho],
+              };
+              
+              setBeads(prev => prev.map(b => b.id === targetBead.id ? updatedBead : b));
+          }
       }
-  };
-
-  const updateBeadContent = (text: string, images: string[], audio: string | undefined) => {
-     // If it's a daily draft, set the initial story
-     if (activeBead.isDraft) {
-        const updatedBead = {
-            ...activeBead,
-            userStory: text,
-            additionalImages: images,
-            audioUrl: audio,
-            isDraft: false,
-            shape: getRandomShape(),
-            date: new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
-        };
-        setDailyBead(updatedBead);
-     } else {
-         // Create a new Echo entry
-         const newEcho: BeadEcho = {
-             id: Date.now().toString(),
-             date: new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }),
-             text: text,
-             images: images,
-             audioUrl: audio
-         };
-
-         const updatedBead = {
-            ...activeBead,
-            echoes: [...(activeBead.echoes || []), newEcho],
-         };
-
-         setBeads(prev => prev.map(b => b.id === updatedBead.id ? updatedBead : b));
-         if (activeBead.type === 'daily') setDailyBead(updatedBead);
-     }
   };
 
   const resetCreation = () => {
@@ -562,134 +728,171 @@ export default function App() {
 
   // --- Renderers ---
 
-  const renderEchoTab = () => {
-    const currentQuestion = activeBead.echoQuestions?.[echoQuestionIndex] || activeBead.prompt;
-    const hasEchoes = activeBead.echoes && activeBead.echoes.length > 0;
-
-    return (
-      <div className="w-full h-full bg-wood relative flex flex-col items-center py-6 px-4 overflow-y-auto overflow-x-hidden no-scrollbar">
-        
-        {/* Top: Dynamic Prompt */}
-        <div className="w-full max-w-sm flex flex-col items-center space-y-2 z-10 animate-fade-in mt-4 shrink-0">
-            <div className="w-full bg-white/10 backdrop-blur-md border border-white/20 p-6 rounded-2xl shadow-lg relative overflow-hidden transition-opacity duration-500">
-                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-white/30 to-transparent" />
-                <p className={`font-serif text-lg text-white text-center italic leading-relaxed drop-shadow-md transition-opacity duration-500 ${isQuestionFading ? 'opacity-0' : 'opacity-100'}`}>
-                    "{currentQuestion}"
-                </p>
+  const renderBeadView = (bead: BeadData, isInteractiveQueue: boolean) => {
+      const currentQuestion = bead.echoQuestions?.[echoQuestionIndex] || bead.prompt;
+      const hasEchoes = bead.echoes && bead.echoes.length > 0;
+      
+      return (
+        <div className="w-full flex flex-col items-center pb-24 relative">
+             {/* Top Prompt */}
+            <div className="w-full max-w-sm flex flex-col items-center space-y-2 z-10 animate-fade-in mt-4 shrink-0 px-4">
+                <div className="w-full bg-white/10 backdrop-blur-md border border-white/20 p-6 rounded-2xl shadow-lg relative overflow-hidden transition-opacity duration-500">
+                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-white/30 to-transparent" />
+                    <p className={`font-serif text-lg text-amber-50 text-center italic leading-relaxed drop-shadow-md transition-opacity duration-500 ${isQuestionFading ? 'opacity-0' : 'opacity-100'}`}>
+                        "{currentQuestion}"
+                    </p>
+                </div>
             </div>
-        </div>
 
-        {/* Middle: Bead & Interaction */}
-        <div className={`relative flex items-center justify-center w-full min-h-[180px] shrink-0 my-6`}>
-            <div className="relative group">
-                <Bead 
-                    data={activeBead} 
-                    size="xl" 
-                    className="transform transition-transform duration-700 ease-in-out hover:scale-105"
-                    onClick={() => handleExpand()}
-                />
-                
-                {/* Expand Overlay Button */}
-                <button 
-                    onClick={handleExpand}
-                    className="absolute inset-0 flex items-center justify-center z-20 group cursor-pointer"
-                >
-                    <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm border border-white/40 flex items-center justify-center animate-pulse-soft shadow-[0_0_20px_rgba(255,255,255,0.3)] transition-all group-hover:bg-white/30 group-hover:scale-110">
-                        <Plus className="text-white drop-shadow-md" size={24} strokeWidth={1.5} />
-                    </div>
-                </button>
-            </div>
-        </div>
-
-        {/* Bottom: Story on Paper (Blog View) */}
-        <div className={`w-full max-w-md z-10 mb-24 animate-slide-up transition-all duration-500`}>
-            <div className={`bg-paper p-8 transform rotate-1 rounded-sm shadow-paper relative flex flex-col ${hasEchoes ? 'paper-stack' : ''}`}>
-                
-                {/* Tape effect - Only show on single sheet */}
-                {!hasEchoes && (
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-24 h-6 bg-white/40 rotate-1 backdrop-blur-[1px] shadow-sm" />
+            {/* Bead Area */}
+            <div className={`relative flex items-center justify-center w-full min-h-[180px] shrink-0 my-6`}>
+                {/* Queue Shuffle Button - Only for Drafts Queue */}
+                {isInteractiveQueue && dailyQueue.length > 1 && (
+                    <button 
+                        onClick={swapToNextDailyPrompt}
+                        className="absolute left-6 top-1/2 -translate-y-1/2 z-30 p-3 bg-white/10 rounded-full hover:bg-white/20 transition-colors backdrop-blur-sm group"
+                        title="Skip to Next"
+                    >
+                        <RefreshCw size={20} className="text-white/70 group-hover:text-white" />
+                    </button>
                 )}
-                
-                <div className="w-full relative group/paper">
-                    {/* Edit Button for Original Story */}
-                    {!activeBead.isDraft && (
+
+                <div className="relative group">
+                    <Bead 
+                        data={bead} 
+                        size="xl" 
+                        className="transform transition-transform duration-700 ease-in-out hover:scale-105"
+                        onClick={() => handleEcho()}
+                    />
+                    
+                    {/* Echo / Add Action */}
+                    <button 
+                        onClick={handleEcho}
+                        className="absolute inset-0 flex items-center justify-center z-20 group cursor-pointer"
+                    >
+                        <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm border border-white/40 flex items-center justify-center animate-pulse-soft shadow-[0_0_20px_rgba(255,255,255,0.3)] transition-all group-hover:bg-white/30 group-hover:scale-110">
+                            <Plus className="text-white drop-shadow-md" size={24} strokeWidth={1.5} />
+                        </div>
+                    </button>
+                </div>
+            </div>
+
+            {/* Title & Date (High Visibility) */}
+            <div className="text-center mb-6">
+                <h2 className="font-serif text-2xl text-amber-50 tracking-wide drop-shadow-lg">{bead.title}</h2>
+                <p className="text-xs text-white/60 font-bold uppercase tracking-widest mt-1">{bead.date}</p>
+            </div>
+
+            {/* Story Paper */}
+            <div className={`w-full max-w-md px-4 z-10 animate-slide-up transition-all duration-500`}>
+                <div className={`bg-paper p-8 transform rotate-1 rounded-sm shadow-paper relative flex flex-col ${hasEchoes ? 'paper-stack' : ''}`}>
+                    
+                    {!hasEchoes && (
+                        <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-24 h-6 bg-white/40 rotate-1 backdrop-blur-[1px] shadow-sm" />
+                    )}
+                    
+                    <div className="w-full relative group/paper">
                         <button 
-                            onClick={handleEditOriginal}
+                            onClick={handleEdit}
                             className="absolute -top-4 -right-4 p-2 bg-white rounded-full shadow-md text-gray-400 hover:text-gray-700 hover:scale-105 transition-all opacity-0 group-hover/paper:opacity-100 z-20"
-                            title="Edit Original Story"
+                            title="Edit Content"
                         >
                             <Pencil size={14} />
                         </button>
-                    )}
 
-                    {/* Original Story */}
-                    <div className="mb-6">
-                        {/* Audio Player for Main Story */}
-                        {activeBead.audioUrl && <MiniAudioPlayer src={activeBead.audioUrl} />}
-
-                        {activeBead.userStory ? (
-                            <p className="font-serif text-gray-800 text-sm leading-relaxed whitespace-pre-line">
-                                {activeBead.userStory}
-                            </p>
-                        ) : (
-                            <p className="font-serif text-gray-400 italic text-sm text-center">
-                                Tap the bead to write your story...
-                            </p>
-                        )}
-                        
-                        {activeBead.additionalImages && activeBead.additionalImages.length > 0 && (
-                            <div className="flex gap-2 mt-4 overflow-x-auto pb-2">
-                                {activeBead.additionalImages.map((src, i) => (
-                                    <img key={i} src={src} className="w-16 h-16 object-cover rounded shadow-sm opacity-90 hover:opacity-100 transition-opacity" alt="memory" />
-                                ))}
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Echoes - Blog Feed */}
-                    {hasEchoes && activeBead.echoes?.map((echo, index) => (
-                        <div key={echo.id} className="pt-6 border-t border-gray-300/50 mt-2 relative animate-fade-in">
-                             {/* Date Header */}
-                             <div className="flex items-center gap-3 mb-3">
-                                <div className="h-[1px] bg-gray-300 flex-1"></div>
-                                <h4 className="font-serif text-xs font-bold text-gray-500 uppercase tracking-widest">
-                                    Echo on {echo.date}
-                                </h4>
-                                <div className="h-[1px] bg-gray-300 flex-1"></div>
-                             </div>
-
-                             {/* Audio Player for Echo Update */}
-                             {echo.audioUrl && <MiniAudioPlayer src={echo.audioUrl} />}
-
-                             <p className="font-serif text-gray-700 text-sm leading-relaxed whitespace-pre-line mb-4">
-                                 {echo.text}
-                             </p>
-
-                             {echo.images && echo.images.length > 0 && (
-                                <div className="flex gap-2 overflow-x-auto pb-2">
-                                    {echo.images.map((src, i) => (
-                                        <img key={i} src={src} className="w-20 h-20 object-cover rounded shadow-sm" alt="echo-memory" />
+                        <div className="mb-6">
+                            {bead.audioUrl && <MiniAudioPlayer src={bead.audioUrl} />}
+                            {bead.userStory ? (
+                                <p className="font-serif text-gray-800 text-sm leading-relaxed whitespace-pre-line">
+                                    {bead.userStory}
+                                </p>
+                            ) : (
+                                <p className="font-serif text-gray-400 italic text-sm text-center">
+                                    Tap the bead to write your story...
+                                </p>
+                            )}
+                            {bead.additionalImages && bead.additionalImages.length > 0 && (
+                                <div className="flex gap-2 mt-4 overflow-x-auto pb-2">
+                                    {bead.additionalImages.map((src, i) => (
+                                        <img key={i} src={src} className="w-16 h-16 object-cover rounded shadow-sm opacity-90 hover:opacity-100 transition-opacity" alt="memory" />
                                     ))}
                                 </div>
-                             )}
+                            )}
                         </div>
-                    ))}
+
+                        {/* Echoes Feed */}
+                        {hasEchoes && bead.echoes?.map((echo) => (
+                            <div key={echo.id} className="pt-6 border-t border-gray-300/50 mt-2 relative animate-fade-in">
+                                 <div className="flex items-center gap-3 mb-3">
+                                    <div className="h-[1px] bg-gray-300 flex-1"></div>
+                                    <h4 className="font-serif text-xs font-bold text-gray-500 uppercase tracking-widest">
+                                        Echo on {echo.date}
+                                    </h4>
+                                    <div className="h-[1px] bg-gray-300 flex-1"></div>
+                                 </div>
+                                 {echo.audioUrl && <MiniAudioPlayer src={echo.audioUrl} />}
+                                 <p className="font-serif text-gray-700 text-sm leading-relaxed whitespace-pre-line mb-4">
+                                     {echo.text}
+                                 </p>
+                                 {echo.images && echo.images.length > 0 && (
+                                    <div className="flex gap-2 overflow-x-auto pb-2">
+                                        {echo.images.map((src, i) => (
+                                            <img key={i} src={src} className="w-20 h-20 object-cover rounded shadow-sm" alt="echo-memory" />
+                                        ))}
+                                    </div>
+                                 )}
+                            </div>
+                        ))}
+                    </div>
                 </div>
             </div>
         </div>
+      );
+  };
+
+  const renderEchoTab = () => {
+    // Echo Tab is STRICTLY for the Queue/Drafts
+    const beadToShow = queueHead;
+
+    return (
+      <div className="w-full h-full bg-wood relative flex flex-col items-center overflow-y-auto overflow-x-hidden no-scrollbar">
+        {!beadToShow ? (
+             // Empty State
+            <div className="flex-1 flex flex-col items-center justify-center text-center px-8 opacity-60">
+                <div className="w-24 h-24 rounded-full border-2 border-dashed border-white/30 flex items-center justify-center mb-6 animate-pulse">
+                    <Check size={40} className="text-white/50" />
+                </div>
+                <h2 className="font-serif text-2xl text-white/80 mb-2">All Caught Up</h2>
+                <p className="text-sm text-white/50 max-w-xs">No new echoes are calling right now...but a new one will drift your way when the time is right.</p>
+            </div>
+        ) : (
+             renderBeadView(beadToShow, true)
+        )}
       </div>
     );
   };
 
   const renderCollectionTab = () => (
     <div className="flex-1 flex flex-col bg-wood relative overflow-hidden">
+       {/* Import Button */}
+       <div className="absolute top-6 right-6 z-30">
+           <button 
+             onClick={() => jsonInputRef.current?.click()}
+             className="p-3 bg-white/10 backdrop-blur-md rounded-full text-white/80 hover:bg-white/20 transition-colors shadow-lg"
+             title="Import Memories from Part 1"
+           >
+              <UploadCloud size={20} />
+           </button>
+           <input ref={jsonInputRef} type="file" accept=".json" onChange={handleJsonUpload} className="hidden" />
+       </div>
+
        {/* Horizontal Scroll Area */}
        <div className="absolute inset-0 flex items-center overflow-x-auto no-scrollbar px-12 snap-x snap-mandatory">
           <div className="flex items-center gap-12 pr-24">
               {/* Header Card in Scroll */}
               <div className="snap-center shrink-0 w-64 h-80 flex flex-col justify-center items-start pl-8 text-white/90">
-                   <h1 className="font-serif text-5xl italic mb-2 tracking-tighter">Memory<br/>Archive</h1>
-                   <p className="text-xs uppercase tracking-[0.2em] opacity-70 border-l border-white/40 pl-4 py-1">
+                   <h1 className="font-serif text-5xl italic mb-2 tracking-tighter text-amber-50">Memory<br/>Archive</h1>
+                   <p className="text-xs uppercase tracking-[0.2em] text-white/60 border-l border-white/40 pl-4 py-1">
                        {beads.length} Stories Collected
                    </p>
               </div>
@@ -700,16 +903,13 @@ export default function App() {
                         <Bead 
                             data={bead} 
                             size="lg" 
-                            onClick={(id) => {
-                                setActiveBeadId(id);
-                                setActiveTab('echo');
-                            }} 
+                            onClick={(id) => setSelectedCollectionBeadId(id)} 
                             className="hover:scale-105 transition-transform duration-500"
                         />
                         {/* Connection Line */}
                         <div className="absolute top-1/2 left-full w-12 h-[2px] bg-white/10 -z-10" />
                      </div>
-                     <div className="bg-black/20 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 text-white/80 text-xs tracking-wider">
+                     <div className="bg-black/20 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 text-white/90 text-xs tracking-wider font-bold">
                          {bead.title}
                      </div>
                  </div>
@@ -721,6 +921,19 @@ export default function App() {
        
        {/* Background Line */}
        <div className="absolute top-1/2 left-0 w-full h-[1px] bg-white/10 -z-10" />
+
+       {/* Collection Detail Popup */}
+       {selectedCollectionBeadId && collectionBead && (
+           <div className="absolute inset-0 z-40 bg-wood/95 backdrop-blur-xl flex flex-col overflow-y-auto no-scrollbar animate-fade-in">
+               <button 
+                 onClick={() => setSelectedCollectionBeadId(null)}
+                 className="fixed top-6 left-6 z-50 p-3 bg-white/10 rounded-full text-white hover:bg-white/20 transition-colors"
+               >
+                   <ChevronLeft size={24} />
+               </button>
+               {renderBeadView(collectionBead, false)}
+           </div>
+       )}
     </div>
   );
 
@@ -815,6 +1028,7 @@ export default function App() {
      </div>
   );
 
+  // Setup modal props dynamically
   return (
     <div className="w-full h-[100dvh] font-sans bg-clay text-gray-600 overflow-hidden flex flex-col">
       <GrainOverlay />
@@ -824,18 +1038,54 @@ export default function App() {
         {activeTab === 'collection' && renderCollectionTab()}
         {activeTab === 'echo' && renderEchoTab()}
         {activeTab === 'create' && renderCreateTab()}
+        
         {/* Modal Overlay */}
         <ExpandModal 
             isOpen={isExpandModalOpen} 
             onClose={() => setIsExpandModalOpen(false)} 
             onSave={handleSaveModal}
-            title={modalMode === 'edit' ? "Edit Original Story" : "Expand Memory"}
-            initialData={modalMode === 'edit' ? {
-                text: activeBead.userStory || '',
-                images: activeBead.additionalImages || [],
-                audio: activeBead.audioUrl
+            title={modalMode === 'edit' ? "Edit Content" : (activeModalBead?.isDraft ? "Reflect & Finalize" : "Add Echo")}
+            initialData={modalMode === 'edit' && activeModalBead ? {
+                title: activeModalBead.title,
+                text: activeModalBead.userStory || '',
+                // Combine imageUrl (main) and additionalImages (paper) so they can be edited together
+                images: activeModalBead.imageUrl 
+                    ? [activeModalBead.imageUrl, ...(activeModalBead.additionalImages || [])]
+                    : (activeModalBead.additionalImages || []),
+                audio: activeModalBead.audioUrl
             } : undefined}
+            mode={modalMode}
+            isDraft={activeModalBead?.isDraft}
         />
+        
+        {/* Player Selection Modal */}
+        {showPlayerSelect && (
+            <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl animate-scale-up">
+                    <h3 className="font-serif text-xl mb-6 text-center text-gray-800">Select Player</h3>
+                    <div className="flex flex-col gap-3">
+                        {playerSelectOptions.map(pid => (
+                            <button
+                                key={pid}
+                                onClick={() => importBeadsForPlayer(pid)}
+                                className="p-4 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors flex items-center gap-4 text-left group"
+                            >
+                                <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center group-hover:bg-gray-400 text-white">
+                                    <User size={20} />
+                                </div>
+                                <span className="font-bold text-gray-600 truncate flex-1">Player {pid.substring(0, 8)}...</span>
+                            </button>
+                        ))}
+                    </div>
+                    <button 
+                        onClick={() => setShowPlayerSelect(false)}
+                        className="mt-6 w-full py-3 text-sm text-gray-500 hover:text-gray-800"
+                    >
+                        Cancel Import
+                    </button>
+                </div>
+            </div>
+        )}
       </main>
 
       {/* Bottom Navigation */}
@@ -849,7 +1099,7 @@ export default function App() {
           />
           <NavButton 
             active={activeTab === 'echo'} 
-            onClick={() => setActiveTab('echo')} 
+            onClick={() => { setActiveTab('echo'); setSelectedCollectionBeadId(null); }} 
             icon={<Infinity size={26} />} 
             label="Echo"
             className="scale-100" 

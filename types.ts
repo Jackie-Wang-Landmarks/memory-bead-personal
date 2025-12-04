@@ -36,3 +36,21 @@ export interface ImageAnalysisResult {
   prompt: string;
   color: string;
 }
+
+// Data structure for the imported JSON
+export interface CoreBead {
+  id: string;
+  type: string;
+  playerId: string;
+  timestamp: number;
+  fullStory: string;
+  storySnippet: string;
+  keyword: string;
+  keywordType: string;
+  audioUrl?: string;
+  images?: string[];
+  notes?: string;
+  reactions?: any;
+  lifeStage?: string;
+  characterMentions?: any[];
+}
